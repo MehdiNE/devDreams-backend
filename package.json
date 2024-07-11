@@ -12,6 +12,7 @@
   "description": "",
   "dependencies": {
     "@types/cors": "^2.8.17",
+    "@types/nodemailer": "^6.4.15",
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -19,7 +20,8 @@
     "express": "^4.19.2",
     "express-validator": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.4.4"
+    "mongoose": "^8.4.4",
+    "nodemailer": "^6.9.14"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
