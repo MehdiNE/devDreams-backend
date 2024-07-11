@@ -8,8 +8,8 @@ import {
   SignupRequest,
   SignupResponse,
   UpdatePasswordServiceRequest,
-} from "../@types/authenticationTypes";
-import { ErrorResponse } from "../@types/global";
+} from "../types/authenticationTypes";
+import { ErrorResponse } from "../types/global";
 import { validateRequest } from "../utils/validateRequest";
 import {
   forgotPasswordValidator,
@@ -80,7 +80,7 @@ export async function handleLogin(
 }
 
 export async function protect(
-  req: Request<{}, {}, LoginRequest>,
+  req: Request,
   _res: Response,
   next: NextFunction
 ) {
@@ -98,8 +98,9 @@ export async function protect(
   }
 
   const { currentUser } = await protectService(token);
+  console.log("🚀 ~ currentUser:", currentUser);
 
-  req.user = currentUser._id;
+  req.userId = String(currentUser?._id);
 
   next();
 }
@@ -160,7 +161,7 @@ export async function updatePassword(
   }
 
   const { token } = await updatePasswordService({
-    id: req.user,
+    id: req.userId ?? "",
     currentPassword,
     newPassword,
   });

@@ -6,7 +6,7 @@ import {
   ResetPasswordService,
   SignupRequest,
   UpdatePasswordServiceProps,
-} from "../@types/authenticationTypes";
+} from "../types/authenticationTypes";
 import bcrypt from "bcrypt";
 import { Types } from "mongoose";
 import AppError from "../utils/appError";

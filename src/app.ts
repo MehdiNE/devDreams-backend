@@ -3,12 +3,20 @@ import cors from "cors";
 import userRoutes from "./routes/userRoutes";
 import AppError from "./utils/appError";
 import globalErrorHandler from "./controllers/errorController";
+import helmet from "helmet";
+import ExpressMongoSanitize from "express-mongo-sanitize";
+import hpp from "hpp";
+const { xss } = require("express-xss-sanitizer");
 
 const app = express();
 
 // Middleware
-app.use(express.json());
+app.use(helmet());
+app.use(express.json({ limit: "10kb" }));
 app.use(cors());
+app.use(ExpressMongoSanitize());
+app.use(xss());
+app.use(hpp());
 
 // Routes
 app.use("/api/v1/users", userRoutes);
