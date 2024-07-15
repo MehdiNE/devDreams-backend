@@ -28,6 +28,15 @@ import {
 } from "../services/authenticationService";
 import AppError from "../utils/appError";
 
+const cookieOption = {
+  expires: new Date(
+    Date.now() +
+      Number(process.env.JWT_COOKIE_EXPIRES_IN ?? 0) * 24 * 60 * 60 * 1000
+  ),
+  secure: true,
+  httpOnly: true,
+};
+
 export async function handleSignup(
   req: Request<{}, {}, SignupRequest>,
   res: Response<SignupResponse | ErrorResponse>
@@ -44,6 +53,15 @@ export async function handleSignup(
     username,
     email,
     password,
+  });
+
+  res.cookie("jwt", token, {
+    expires: new Date(
+      Date.now() +
+        Number(process.env.JWT_COOKIE_EXPIRES_IN ?? 0) * 24 * 60 * 60 * 1000
+    ),
+    secure: true,
+    httpOnly: true,
   });
 
   res?.status(201).json({
@@ -68,6 +86,8 @@ export async function handleLogin(
   }
 
   const { user, token } = await loginService({ email, password });
+
+  res.cookie("jwt", token, cookieOption);
 
   res?.status(200).json({
     status: "success",
