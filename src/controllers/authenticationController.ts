@@ -22,17 +22,15 @@ import {
   forgotPasswordService,
   loginService,
   protectService,
+  refreshTokenService,
   resetPasswordService,
+  signOutService,
   signupService,
   updatePasswordService,
 } from "../services/authenticationService";
 import AppError from "../utils/appError";
 
 const cookieOption = {
-  expires: new Date(
-    Date.now() +
-      Number(process.env.JWT_COOKIE_EXPIRES_IN ?? 0) * 24 * 60 * 60 * 1000
-  ),
   secure: true,
   httpOnly: true,
 };
@@ -55,23 +53,18 @@ export async function handleSignup(
     password,
   });
 
-  res.cookie("jwt", token, {
-    expires: new Date(
-      Date.now() +
-        Number(process.env.JWT_COOKIE_EXPIRES_IN ?? 0) * 24 * 60 * 60 * 1000
-    ),
-    secure: true,
-    httpOnly: true,
-  });
-
-  res?.status(201).json({
-    status: "success",
-    message: "User created successfully.",
-    data: {
-      ...user,
-      token,
-    },
-  });
+  res
+    ?.status(201)
+    .cookie("accessToken", token.accessToken, cookieOption)
+    .cookie("refreshToken", token.refreshToken, cookieOption)
+    .json({
+      status: "success",
+      message: "User created successfully.",
+      data: {
+        ...user,
+        token,
+      },
+    });
 }
 
 export async function handleLogin(
@@ -85,18 +78,77 @@ export async function handleLogin(
     throw new AppError("inputs are not valid.", 400, errors.array());
   }
 
-  const { user, token } = await loginService({ email, password });
-
-  res.cookie("jwt", token, cookieOption);
-
-  res?.status(200).json({
-    status: "success",
-    message: "User logged in successfully.",
-    data: {
-      ...user,
-      token,
-    },
+  const { user, token } = await loginService({
+    email,
+    password,
   });
+
+  res
+    ?.status(200)
+    .cookie("accessToken", token.accessToken, cookieOption)
+    .cookie("refreshToken", token.refreshToken, cookieOption)
+    .json({
+      status: "success",
+      message: "User logged in successfully.",
+      data: {
+        ...user,
+        token,
+      },
+    });
+}
+
+export async function handleSignOut(
+  req: Request<{}, {}, LoginRequest>,
+  res: Response<LoginResponse | ErrorResponse>
+) {
+  const userId = req.userId;
+
+  if (!userId) {
+    throw new AppError("User id not found", 401);
+  }
+
+  await signOutService({ userId });
+
+  return res
+    .status(200)
+    .cookie("accessToken", cookieOption)
+    .cookie("refreshToken", cookieOption)
+    .json({ status: "success", message: "Logged out successfully" });
+}
+
+export async function refreshTokenHandler(
+  req: Request<{}, {}, LoginRequest>,
+  res: Response<any | ErrorResponse>
+) {
+  // Look for the token in cookies or headers
+  const accessToken =
+    req.cookies?.accessToken ||
+    req.header("Authorization")?.replace("Bearer ", "");
+
+  // If there's no token, deny access with a 401 Unauthorized status
+  if (!accessToken) {
+    throw new AppError("access Token not found", 401);
+  }
+
+  const incomingRefreshToken = req.headers.refreshtoken as string;
+
+  if (!incomingRefreshToken) {
+    throw new AppError("Refresh token not found", 401);
+  }
+
+  const { token } = await refreshTokenService({
+    refreshToken: incomingRefreshToken,
+  });
+
+  res
+    .status(200)
+    .cookie("accessToken", token.accessToken, cookieOption)
+    .cookie("refreshToken", token.refreshToken, cookieOption)
+    .json({
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+      message: "Access token refreshed",
+    });
 }
 
 export async function protect(
@@ -118,7 +170,6 @@ export async function protect(
   }
 
   const { currentUser } = await protectService(token);
-  console.log("🚀 ~ currentUser:", currentUser);
 
   req.userId = String(currentUser?._id);
 
@@ -157,15 +208,22 @@ export async function resetPassword(
     throw new AppError("inputs are not valid.", 400, errors.array());
   }
 
-  const { loginToken } = await resetPasswordService({ token, password });
-
-  res?.status(200).json({
-    status: "success",
-    message: "Password changed successfully.",
-    data: {
-      token: loginToken,
-    },
+  const { newToken } = await resetPasswordService({
+    token,
+    password,
   });
+
+  res
+    ?.status(200)
+    .cookie("accessToken", newToken.accessToken, cookieOption)
+    .cookie("refreshToken", newToken.refreshToken, cookieOption)
+    .json({
+      status: "success",
+      message: "Password changed successfully.",
+      data: {
+        newToken,
+      },
+    });
 }
 
 export async function updatePassword(
@@ -186,9 +244,13 @@ export async function updatePassword(
     newPassword,
   });
 
-  res.status(201).json({
-    status: "success",
-    message: "Password updated successfully.",
-    token,
-  });
+  res
+    .status(201)
+    .cookie("accessToken", token.accessToken, cookieOption)
+    .cookie("refreshToken", token.refreshToken, cookieOption)
+    .json({
+      status: "success",
+      message: "Password updated successfully.",
+      token,
+    });
 }

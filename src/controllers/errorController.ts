@@ -1,14 +1,23 @@
 import { ErrorRequestHandler, Response } from "express";
 import { ValidationError } from "express-validator";
+import AppError from "../utils/appError";
 
-interface AppError extends Error {
+interface ErrorType extends Error {
   statusCode?: number;
   status?: string;
   isOperational?: boolean;
   errors?: ValidationError[];
 }
 
-function sendErrorDev(err: AppError, res: Response) {
+function handleJWTError() {
+  return new AppError("Invalid Token. Please login again!", 401);
+}
+
+function handleJWTExpiredError() {
+  return new AppError("Your token has expired!. Please login again.", 401);
+}
+
+function sendErrorDev(err: ErrorType, res: Response) {
   res.status(err.statusCode ?? 500).json({
     status: err.status,
     message: err.message,
@@ -17,7 +26,7 @@ function sendErrorDev(err: AppError, res: Response) {
   });
 }
 
-function sendErrorProd(err: AppError, res: Response) {
+function sendErrorProd(err: ErrorType, res: Response) {
   // Trusted error
   if (err.isOperational) {
     res.status(err.statusCode ?? 500).json({
@@ -31,13 +40,13 @@ function sendErrorProd(err: AppError, res: Response) {
 
     res.status(500).json({
       status: "error",
-      message: "Something went very wrong!",
+      message: err.message,
     });
   }
 }
 
 const globalErrorHandler: ErrorRequestHandler = (
-  err: AppError,
+  err: ErrorType,
   _req,
   res: Response,
   _next
@@ -47,10 +56,15 @@ const globalErrorHandler: ErrorRequestHandler = (
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV!.trim() === "development") {
     sendErrorDev(err, res);
-  } else if (process.env.NODE_ENV === "production") {
-    sendErrorProd(err, res);
+  } else if (process.env.NODE_ENV!.trim() === "production") {
+    let error = { ...err };
+
+    if (error.name === "JsonWebTokenError") error = handleJWTError();
+    if (error.name === "TokenExpiredError") error = handleJWTExpiredError();
+
+    sendErrorProd(error, res);
   }
 };
 

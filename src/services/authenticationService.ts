@@ -12,11 +12,29 @@ import { Types } from "mongoose";
 import AppError from "../utils/appError";
 import crypto from "crypto";
 import sendEmail from "../utils/email";
+import jwtVerifyPromisified from "../utils/jwtVerifyPromisified";
 
-function signToken(id: Types.ObjectId) {
-  return jwt.sign({ id }, process.env.ACCESS_TOKEN_SECRET ?? "", {
-    expiresIn: process.env.JWT_EXPIRES_IN,
+async function signToken(id: Types.ObjectId) {
+  const user = await UserModel.findById(id);
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  const accessToken = jwt.sign({ id }, process.env.ACCESS_TOKEN_SECRET!, {
+    expiresIn: "15m",
   });
+
+  const refreshToken = jwt.sign({ id }, process.env.REFRESH_TOKEN_SECRET!, {
+    expiresIn: "1d",
+  });
+
+  user.refreshToken = refreshToken;
+  await user.save({ validateBeforeSave: false });
+
+  const token = { accessToken, refreshToken };
+
+  return token;
 }
 
 export async function signupService({
@@ -40,7 +58,7 @@ export async function signupService({
       password: hashPassword,
     });
 
-    const token = signToken(newUser._id);
+    const token = await signToken(newUser._id);
 
     return {
       user: { username: newUser.username, email: newUser.email },
@@ -68,26 +86,55 @@ export async function loginService({ email, password }: LoginRequest) {
   }
 
   // 3) If everything ok, send token to client
-  const token = signToken(user._id);
+  const token = await signToken(user._id);
 
-  return { user: { username: user.username, email: user.email }, token };
+  return {
+    user: { username: user.username, email: user.email },
+    token,
+  };
+}
+
+export async function signOutService({ userId }: { userId: string }) {
+  await UserModel.findByIdAndUpdate(
+    userId,
+    {
+      refreshToken: null,
+    },
+    { new: true }
+  );
+}
+
+export async function refreshTokenService({
+  refreshToken,
+}: {
+  refreshToken: string;
+}) {
+  // Verification token
+  const decoded = (await jwtVerifyPromisified(
+    refreshToken,
+    process.env.REFRESH_TOKEN_SECRET ?? ""
+  )) as { id: string; iat: number };
+
+  // Find the user associated with the refresh token
+  const user = await UserModel.findById(decoded?.id);
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  if (user.refreshToken !== refreshToken) {
+    throw new AppError("Refresh token is invalid", 401);
+  }
+
+  // Sign new accessToken and refreshToken
+  const token = await signToken(user._id);
+
+  return { token };
 }
 
 export async function protectService(token: string) {
   // 1) Getting token and check if it's there
   // 2) Verification token
-  const jwtVerifyPromisified = (token: string, secret: string) => {
-    return new Promise((resolve, reject) => {
-      jwt.verify(token, secret, {}, (err, payload) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(payload);
-        }
-      });
-    });
-  };
-
   const decoded = (await jwtVerifyPromisified(
     token,
     process.env.ACCESS_TOKEN_SECRET ?? ""
@@ -148,7 +195,7 @@ export async function forgotPasswordService({
     await sendEmail({
       email,
       subject: "Reset your password",
-      message: resetToken,
+      message: `http://localhost:3000/resetpassword/${resetToken}`,
     });
   } catch (error) {
     await UserModel.updateOne(
@@ -183,16 +230,18 @@ export async function resetPasswordService({
     throw new AppError("Token is invalid or has expired", 400);
   }
 
-  user.password = password;
+  const hashPassword = await bcrypt.hash(password, 12);
+
+  user.password = hashPassword;
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
   user.changedPasswordAt = Date.now() - 1000;
   await user.save();
 
   // 3) Log the user in, send JWT
-  const loginToken = signToken(user._id);
+  const newToken = await signToken(user._id);
 
-  return { loginToken };
+  return { newToken };
 }
 
 export async function updatePasswordService({
@@ -220,7 +269,7 @@ export async function updatePasswordService({
   await user.save();
 
   // 4) Log user in, send JWT
-  const token = signToken(user._id);
+  const token = await signToken(user._id);
 
   return { token };
 }

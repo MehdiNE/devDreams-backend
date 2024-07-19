@@ -2,8 +2,10 @@ import express from "express";
 import {
   forgotPassword,
   handleLogin,
+  handleSignOut,
   handleSignup,
   protect,
+  refreshTokenHandler,
   resetPassword,
   updatePassword,
 } from "../controllers/authenticationController";
@@ -22,5 +24,8 @@ router.patch(
   asyncHandler(protect),
   asyncHandler(updatePassword)
 );
+
+router.post("/signOut", asyncHandler(protect), asyncHandler(handleSignOut));
+router.post("/refreshToken", asyncHandler(refreshTokenHandler));
 
 export default router;

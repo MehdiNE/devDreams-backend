@@ -6,6 +6,8 @@ import globalErrorHandler from "./controllers/errorController";
 import helmet from "helmet";
 import ExpressMongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
+import { protect } from "./controllers/authenticationController";
+import asyncHandler from "./utils/asyncHandler";
 const { xss } = require("express-xss-sanitizer");
 
 const app = express();
@@ -20,6 +22,10 @@ app.use(hpp());
 
 // Routes
 app.use("/api/v1/users", userRoutes);
+
+app.get("/api/v1/hello", asyncHandler(protect), (_req, res, _next) => {
+  res.status(200).json({ message: "hello world" });
+});
 
 // Unhandled Routes
 app.all("*", (req: Request, _res: Response, next) => {

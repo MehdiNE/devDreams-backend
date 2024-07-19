@@ -9,7 +9,10 @@ export interface SignupRequest {
 
 export interface SignupResponse {
   data: {
-    token: string;
+    token: {
+      accessToken: String;
+      refreshToken: string;
+    };
     username: string;
     email: string;
   };
