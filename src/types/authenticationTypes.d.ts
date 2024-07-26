@@ -13,7 +13,7 @@ export interface SignupResponse {
       accessToken: String;
       refreshToken: string;
     };
-    username: string;
+    username?: string | null;
     email: string;
   };
   status: StatusType;

@@ -55,6 +55,7 @@ export async function signupService({
     const newUser = await UserModel.create({
       username,
       email,
+      authMethods: ["local"],
       password: hashPassword,
     });
 
@@ -81,7 +82,15 @@ export async function loginService({ email, password }: LoginRequest) {
   // 2) Check if user exists && password is correct
   const user = await UserModel.findOne({ email }).select("+password");
 
-  if (!user || !(await bcrypt.compare(password, user?.password))) {
+  // Check if user has local auth method
+  if (user && !user.authMethods.includes("local")) {
+    throw new AppError(
+      `This account doesn't use username/password login. Please use Google or GitHub to sign in. You can sign in with ${user.authMethods}`,
+      400
+    );
+  }
+
+  if (!user || !(await bcrypt.compare(password, user?.password ?? ""))) {
     throw new AppError("Incorrect email or password", 400);
   }
 
@@ -257,7 +266,7 @@ export async function updatePasswordService({
   }
 
   // 2) Check if POSTed current password is correct
-  if (!(await bcrypt.compare(currentPassword, user?.password))) {
+  if (!(await bcrypt.compare(currentPassword, user?.password ?? ""))) {
     throw new AppError("Current password is wrong!", 400);
   }
 
@@ -272,4 +281,10 @@ export async function updatePasswordService({
   const token = await signToken(user._id);
 
   return { token };
+}
+
+export async function googleRedirectService(userId: Types.ObjectId) {
+  const token = await signToken(userId);
+
+  return token;
 }

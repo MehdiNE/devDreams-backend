@@ -20,6 +20,7 @@ import {
 } from "../validators/authenticationValidators";
 import {
   forgotPasswordService,
+  googleRedirectService,
   loginService,
   protectService,
   refreshTokenService,
@@ -252,5 +253,23 @@ export async function updatePassword(
       status: "success",
       message: "Password updated successfully.",
       token,
+    });
+}
+
+// Google
+export async function googleRedirectController(req: Request, res: Response) {
+  //@ts-ignore
+  const token = await googleRedirectService(req.user._id);
+
+  res
+    ?.status(200)
+    .cookie("accessToken", token.accessToken, cookieOption)
+    .cookie("refreshToken", token.refreshToken, cookieOption)
+    .json({
+      status: "success",
+      message: "User logged in successfully.",
+      data: {
+        token,
+      },
     });
 }
