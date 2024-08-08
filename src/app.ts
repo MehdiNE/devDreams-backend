@@ -10,6 +10,7 @@ import { protect } from "./controllers/authenticationController";
 import asyncHandler from "./utils/asyncHandler";
 import passport from "passport";
 const { xss } = require("express-xss-sanitizer");
+import cookieParser from "cookie-parser";
 require("./strategies/google");
 
 const app = express();
@@ -17,10 +18,11 @@ const app = express();
 // Middleware
 app.use(helmet());
 app.use(express.json({ limit: "10kb" }));
-app.use(cors());
+app.use(cors({ credentials: true, origin: "http://localhost:3000" }));
 app.use(ExpressMongoSanitize());
 app.use(xss());
 app.use(hpp());
+app.use(cookieParser());
 app.use(passport.initialize());
 
 // Routes

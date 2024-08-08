@@ -59,7 +59,7 @@ const globalErrorHandler: ErrorRequestHandler = (
   if (process.env.NODE_ENV!.trim() === "development") {
     sendErrorDev(err, res);
   } else if (process.env.NODE_ENV!.trim() === "production") {
-    let error = { ...err };
+    let error = err;
 
     if (error.name === "JsonWebTokenError") error = handleJWTError();
     if (error.name === "TokenExpiredError") error = handleJWTExpiredError();

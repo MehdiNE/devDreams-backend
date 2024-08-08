@@ -1,15 +1,18 @@
-import { NextFunction, Request, Response } from "express";
+import { CookieOptions, NextFunction, Request, Response } from "express";
 import {
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
+  RefreshTokenResponse,
   ResetPasswordParams,
   ResetPasswordRequest,
+  ResetPasswordResponse,
   SignupRequest,
   SignupResponse,
-  UpdatePasswordServiceRequest,
+  UpdatePasswordRequest,
+  UpdatePasswordResponse,
 } from "../types/authenticationTypes";
-import { ErrorResponse } from "../types/global";
+import { ApiResponse } from "../types/global";
 import { validateRequest } from "../utils/validateRequest";
 import {
   forgotPasswordValidator,
@@ -31,245 +34,159 @@ import {
 } from "../services/authenticationService";
 import AppError from "../utils/appError";
 
-const cookieOption = {
-  secure: true,
+const cookieOptions: CookieOptions = {
+  secure: process.env.NODE_ENV === "production",
   httpOnly: true,
+  sameSite: "strict",
 };
 
-export async function handleSignup(
+const sendTokenResponse = (
+  res: Response,
+  statusCode: number,
+  message: string,
+  data: any
+) => {
+  const { accessToken, refreshToken, ...userData } = data;
+
+  res
+    .status(statusCode)
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .json({
+      status: "success",
+      message,
+      data: userData,
+    });
+};
+
+export const handleSignup = async (
   req: Request<{}, {}, SignupRequest>,
-  res: Response<SignupResponse | ErrorResponse>
-) {
-  // Validation
-  const errors = await validateRequest(req, registerValidator);
-  if (!errors.isEmpty()) {
-    throw new AppError("inputs are not valid.", 400, errors.array());
-  }
+  res: Response<SignupResponse>
+) => {
+  await validateRequest(req, registerValidator);
 
   const { username, email, password } = req.body;
+  const { user, token } = await signupService({ username, email, password });
 
-  const { user, token } = await signupService({
-    username,
-    email,
-    password,
+  sendTokenResponse(res, 201, "User created successfully.", {
+    ...user,
+    ...token,
   });
+};
 
-  res
-    ?.status(201)
-    .cookie("accessToken", token.accessToken, cookieOption)
-    .cookie("refreshToken", token.refreshToken, cookieOption)
-    .json({
-      status: "success",
-      message: "User created successfully.",
-      data: {
-        ...user,
-        token,
-      },
-    });
-}
-
-export async function handleLogin(
+export const handleLogin = async (
   req: Request<{}, {}, LoginRequest>,
-  res: Response<LoginResponse | ErrorResponse>
-) {
+  res: Response<LoginResponse>
+) => {
+  await validateRequest(req, loginValidator);
+
   const { email, password } = req.body;
-  // Validation
-  const errors = await validateRequest(req, loginValidator);
-  if (!errors.isEmpty()) {
-    throw new AppError("inputs are not valid.", 400, errors.array());
-  }
+  const { user, token } = await loginService({ email, password });
 
-  const { user, token } = await loginService({
-    email,
-    password,
+  sendTokenResponse(res, 200, "User logged in successfully.", {
+    ...user,
+    ...token,
   });
+};
 
-  res
-    ?.status(200)
-    .cookie("accessToken", token.accessToken, cookieOption)
-    .cookie("refreshToken", token.refreshToken, cookieOption)
-    .json({
-      status: "success",
-      message: "User logged in successfully.",
-      data: {
-        ...user,
-        token,
-      },
-    });
-}
-
-export async function handleSignOut(
-  req: Request<{}, {}, LoginRequest>,
-  res: Response<LoginResponse | ErrorResponse>
-) {
+export const handleSignOut = async (req: Request, res: Response) => {
   const userId = req.userId;
+  if (!userId) throw new AppError("User id not found", 401);
 
-  if (!userId) {
-    throw new AppError("User id not found", 401);
-  }
-
-  await signOutService({ userId });
-
-  return res
-    .status(200)
-    .cookie("accessToken", cookieOption)
-    .cookie("refreshToken", cookieOption)
-    .json({ status: "success", message: "Logged out successfully" });
-}
-
-export async function refreshTokenHandler(
-  req: Request<{}, {}, LoginRequest>,
-  res: Response<any | ErrorResponse>
-) {
-  // Look for the token in cookies or headers
-  const accessToken =
-    req.cookies?.accessToken ||
-    req.header("Authorization")?.replace("Bearer ", "");
-
-  // If there's no token, deny access with a 401 Unauthorized status
-  if (!accessToken) {
-    throw new AppError("access Token not found", 401);
-  }
-
-  const incomingRefreshToken = req.headers.refreshtoken as string;
-
-  if (!incomingRefreshToken) {
-    throw new AppError("Refresh token not found", 401);
-  }
-
-  const { token } = await refreshTokenService({
-    refreshToken: incomingRefreshToken,
-  });
+  await signOutService(userId);
 
   res
     .status(200)
-    .cookie("accessToken", token.accessToken, cookieOption)
-    .cookie("refreshToken", token.refreshToken, cookieOption)
-    .json({
-      accessToken: token.accessToken,
-      refreshToken: token.refreshToken,
-      message: "Access token refreshed",
-    });
-}
+    .clearCookie("accessToken")
+    .clearCookie("refreshToken")
+    .json({ status: "success", message: "Logged out successfully" });
+};
 
-export async function protect(
+export const refreshTokenHandler = async (
+  req: Request,
+  res: Response<RefreshTokenResponse>
+) => {
+  const accessToken = req.cookies?.accessToken;
+  if (!accessToken) throw new AppError("Access Token not found", 401);
+
+  const incomingRefreshToken = req.cookies?.refreshToken;
+  const token = await refreshTokenService(incomingRefreshToken);
+
+  sendTokenResponse(res, 200, "Access token refreshed", token);
+};
+
+export const protect = async (
   req: Request,
   _res: Response,
   next: NextFunction
-) {
-  let token;
+) => {
+  const accessToken = req.cookies?.accessToken;
+  if (!accessToken)
+    throw new AppError(
+      "You are not logged in! Please log in to get access.",
+      401
+    );
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    token = req.headers.authorization.split(" ")[1];
-  }
-
-  if (!token) {
-    throw new AppError("You are not log in! Please log in to get access.", 401);
-  }
-
-  const { currentUser } = await protectService(token);
-
+  const { currentUser } = await protectService(accessToken);
   req.userId = String(currentUser?._id);
-
   next();
-}
+};
 
-export async function forgotPassword(
+export const forgotPassword = async (
   req: Request<{}, {}, ForgotPasswordRequest>,
-  res: Response
-) {
-  const { email } = req.body;
-  // Validation
-  const errors = await validateRequest(req, forgotPasswordValidator);
-  if (!errors.isEmpty()) {
-    throw new AppError("inputs are not valid.", 400, errors.array());
-  }
+  res: Response<ApiResponse>
+) => {
+  await validateRequest(req, forgotPasswordValidator);
 
+  const { email } = req.body;
   await forgotPasswordService({ email });
 
   res.status(200).json({
     status: "success",
     message: "Token sent to email!",
   });
-}
+};
 
-export async function resetPassword(
+export const resetPassword = async (
   req: Request<ResetPasswordParams, {}, ResetPasswordRequest>,
-  res: Response
-) {
+  res: Response<ResetPasswordResponse>
+) => {
+  await validateRequest(req, resetPasswordValidator);
+
   const { token } = req.params;
   const { password } = req.body;
+  const newToken = await resetPasswordService({ token, password });
 
-  // Validation
-  const errors = await validateRequest(req, resetPasswordValidator);
-  if (!errors.isEmpty()) {
-    throw new AppError("inputs are not valid.", 400, errors.array());
-  }
+  sendTokenResponse(res, 200, "Password changed successfully.", newToken);
+};
 
-  const { newToken } = await resetPasswordService({
-    token,
-    password,
-  });
+export const updatePassword = async (
+  req: Request<{}, {}, UpdatePasswordRequest>,
+  res: Response<UpdatePasswordResponse>
+) => {
+  await validateRequest(req, updatePasswordValidator);
 
-  res
-    ?.status(200)
-    .cookie("accessToken", newToken.accessToken, cookieOption)
-    .cookie("refreshToken", newToken.refreshToken, cookieOption)
-    .json({
-      status: "success",
-      message: "Password changed successfully.",
-      data: {
-        newToken,
-      },
-    });
-}
-
-export async function updatePassword(
-  req: Request<{}, {}, UpdatePasswordServiceRequest>,
-  res: Response
-) {
   const { currentPassword, newPassword } = req.body;
-
-  // Validation
-  const errors = await validateRequest(req, updatePasswordValidator);
-  if (!errors.isEmpty()) {
-    throw new AppError("inputs are not valid.", 400, errors.array());
-  }
-
-  const { token } = await updatePasswordService({
+  const token = await updatePasswordService({
     id: req.userId ?? "",
     currentPassword,
     newPassword,
   });
 
-  res
-    .status(201)
-    .cookie("accessToken", token.accessToken, cookieOption)
-    .cookie("refreshToken", token.refreshToken, cookieOption)
-    .json({
-      status: "success",
-      message: "Password updated successfully.",
-      token,
-    });
-}
+  sendTokenResponse(res, 201, "Password updated successfully.", token);
+};
 
 // Google
-export async function googleRedirectController(req: Request, res: Response) {
+export const googleRedirectController = async (req: Request, res: Response) => {
   //@ts-ignore
   const token = await googleRedirectService(req.user._id);
 
-  res
-    ?.status(200)
-    .cookie("accessToken", token.accessToken, cookieOption)
-    .cookie("refreshToken", token.refreshToken, cookieOption)
-    .json({
-      status: "success",
-      message: "User logged in successfully.",
-      data: {
-        token,
-      },
-    });
-}
+  // Consider using a more secure method for passing tokens, like encrypted JWE in a cookie
+  const redirectUrl = new URL(
+    `${process.env.FRONTEND_URL}/auth/google-redirect`
+  );
+  redirectUrl.searchParams.append("accessToken", token.accessToken);
+  redirectUrl.searchParams.append("refreshToken", token.refreshToken);
+
+  res.redirect(redirectUrl.toString());
+};

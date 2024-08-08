@@ -1,5 +1,6 @@
-import { StatusType } from "./global";
+import { ApiResponse, StatusType } from "./global";
 
+// Signup
 export interface SignupRequest {
   username: string;
   email: string;
@@ -7,7 +8,7 @@ export interface SignupRequest {
   confirmPassword: string;
 }
 
-export interface SignupResponse {
+export interface SignupResponse extends ApiResponse {
   data: {
     token: {
       accessToken: String;
@@ -16,11 +17,15 @@ export interface SignupResponse {
     username?: string | null;
     email: string;
   };
-  status: StatusType;
-  message: string;
 }
 
-export type LoginRequest = Omit<SignupRequest, "username" | "confirmPassword">;
+export type SignupServiceProps = Omit<SignupRequest, "confirmPassword">;
+
+// Login
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
 
 export type LoginResponse = SignupResponse;
 
@@ -37,6 +42,13 @@ export interface ResetPasswordRequest {
   confirmPassword: string;
 }
 
+export interface ResetPasswordResponse extends ApiResponse {
+  data: {
+    accessToken: string;
+    refreshToken: string;
+  };
+}
+
 export type ResetPasswordParams = { token: string };
 
 export interface ResetPasswordService {
@@ -45,6 +57,17 @@ export interface ResetPasswordService {
 }
 
 // Update password
+export interface UpdatePasswordRequest {
+  id: string;
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface UpdatePasswordResponse extends ApiResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
 export interface UpdatePasswordServiceProps {
   id: string;
   currentPassword: string;
@@ -55,4 +78,10 @@ export interface UpdatePasswordServiceRequest {
   currentPassword: string;
   newPassword: string;
   confirmNewPassword: string;
+}
+
+// Refresh token
+export interface RefreshTokenResponse extends ApiResponse {
+  accessToken: string;
+  refreshToken: string;
 }
