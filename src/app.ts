@@ -9,8 +9,9 @@ import hpp from "hpp";
 import { protect } from "./controllers/authenticationController";
 import asyncHandler from "./utils/asyncHandler";
 import passport from "passport";
-const { xss } = require("express-xss-sanitizer");
 import cookieParser from "cookie-parser";
+import { limiter } from "./middleware/rateLimiter";
+const { xss } = require("express-xss-sanitizer");
 require("./strategies/google");
 
 const app = express();
@@ -24,6 +25,7 @@ app.use(xss());
 app.use(hpp());
 app.use(cookieParser());
 app.use(passport.initialize());
+app.use(limiter);
 
 // Routes
 app.use("/api/v1/auth", authRoutes);
