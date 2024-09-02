@@ -55,7 +55,11 @@ const sendTokenResponse = (
     .json({
       status: "success",
       message,
-      data: userData,
+      data: {
+        user: userData,
+        accessToken,
+        refreshToken,
+      },
     });
 };
 

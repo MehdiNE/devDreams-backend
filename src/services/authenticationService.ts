@@ -21,7 +21,7 @@ const signToken = async (id: Types.ObjectId) => {
   }
 
   const accessToken = jwt.sign({ id }, process.env.ACCESS_TOKEN_SECRET!, {
-    expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "30m",
+    expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "1d",
   });
 
   const refreshToken = jwt.sign({ id }, process.env.REFRESH_TOKEN_SECRET!, {

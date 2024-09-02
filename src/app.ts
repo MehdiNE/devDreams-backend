@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes";
+import postRoutes from "./routes/postRoutes";
 import AppError from "./utils/appError";
 import globalErrorHandler from "./controllers/errorController";
 import helmet from "helmet";
@@ -29,6 +30,7 @@ app.use(limiter);
 
 // Routes
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/posts", postRoutes);
 
 app.get("/api/v1/hello", asyncHandler(protect), (_req, res, _next) => {
   res.status(200).json({ message: "hello world" });

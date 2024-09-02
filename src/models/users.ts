@@ -11,6 +11,14 @@ const UserSchema = new mongoose.Schema({
   changedPasswordAt: Number,
   passwordResetToken: String,
   passwordResetExpires: Date,
+
+  bio: String,
+  createdAt: Date,
+  githubAccount: String,
+  name: String,
+  avatar: String,
+  location: String,
+  website: String,
 });
 
 export const UserModel = mongoose.model("User", UserSchema);
