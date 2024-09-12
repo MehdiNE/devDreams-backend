@@ -21,6 +21,10 @@ export interface PostIdParams {
   id: string;
 }
 
+export interface LikePostIdParams {
+  postId: string;
+}
+
 export interface DeletePostService {
   postId: string;
   userId: string;

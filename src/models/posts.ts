@@ -8,6 +8,10 @@ const PostSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   createdAt: { type: Date, default: Date.now(), required: true },
   estimatedReadingTime: Number,
+  likesCount: {
+    type: Number,
+    default: 0,
+  },
   tags: [
     {
       type: String,

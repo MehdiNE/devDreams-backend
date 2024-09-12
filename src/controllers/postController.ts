@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import {
+  LikePostIdParams,
   PostIdParams,
   PostRequest,
   PostRequestResponse,
@@ -12,6 +13,7 @@ import {
   getOnePostService,
   getPostService,
 } from "../services/postService";
+import { toggleLikeService } from "../services/likeService";
 
 export const createPostHandler = async (
   req: Request<{}, {}, PostRequest>,
@@ -75,5 +77,20 @@ export const getOnePostHandler = async (
     status: "success",
     message: null,
     data: post,
+  });
+};
+
+export const toggleLikeHandler = async (
+  req: Request<LikePostIdParams>,
+  res: Response
+) => {
+  const { postId } = req.params;
+  const userId = req.userId;
+
+  await toggleLikeService({ userId: userId!, postId });
+
+  res.status(200).json({
+    status: "success",
+    message: null,
   });
 };

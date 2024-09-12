@@ -5,6 +5,7 @@ import {
   deletePostHandler,
   getOnePostHandler,
   getPostHandler,
+  toggleLikeHandler,
 } from "../controllers/postController";
 import { protect } from "../controllers/authenticationController";
 
@@ -15,5 +16,13 @@ router.post("/", asyncHandler(protect), asyncHandler(createPostHandler));
 router.delete("/:id", asyncHandler(protect), asyncHandler(deletePostHandler));
 router.get("/:id", asyncHandler(getOnePostHandler));
 // Update post
+
+// Likes
+router.post(
+  "/:postId/like",
+  asyncHandler(protect),
+  asyncHandler(toggleLikeHandler)
+);
+// router.get('/posts/:postId/likes', postLikesController.getLikes);
 
 export default router;
