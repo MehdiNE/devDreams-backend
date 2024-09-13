@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+// Todo: some property like refreshToken and authMethods shouldn't be return in every query
 const UserSchema = new mongoose.Schema({
   username: { type: String },
   email: { type: String, required: true },

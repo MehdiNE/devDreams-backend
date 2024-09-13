@@ -12,6 +12,10 @@ const PostSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  bookmarkCount: {
+    type: Number,
+    default: 0,
+  },
   tags: [
     {
       type: String,
